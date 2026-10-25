@@ -1,0 +1,5 @@
+*.log
+*.bak
+*.7z
+Thumbs.db
+.DS_Store
