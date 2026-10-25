@@ -1,6 +1,6 @@
 # BuffTrack
 
-An [Ashita v4](https://www.ashitaxi.com/) addon for Final Fantasy XI that helps mages manage their duties: who needs which buff, who needs an esuna, and what enemy buffs are worth dispelling. Alerts show as on-screen text, with optional audio cues.
+An [Ashita v4](https://www.ashitaxi.com/) addon for tracking mage duties. Buff timers, esuna prompts, and enemy buff tracking for dispel.
 
 Built for **Ashita v4.30** on the **PhoenixXI** server. It should work on other LandSandBoat (LSB) servers.
 
