@@ -4,8 +4,6 @@ An [Ashita v4](https://www.ashitaxi.com/) addon for tracking mage duties. Buff t
 
 Built for **Ashita v4.30** on the **PhoenixXI** server. It should work on other LandSandBoat (LSB) servers.
 
-> **Status:** posted publicly for peer review only. Not intended for distribution or support. The code was written through Claude prompts.
-
 ## Features
 
 BuffTrack has three independent panels. Each can be positioned, scaled, and locked on its own, and they snap to each other.
