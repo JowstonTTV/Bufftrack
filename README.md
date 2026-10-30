@@ -24,7 +24,7 @@ Other highlights:
 
 ## Installation
 
-1. Download `BuffTrack-v1.0.zip` from the [Releases](../../releases) page.
+1. Download `BuffTrack.7z` from the [Releases](../../releases) page.
 2. Extract it so the folder lands at `<Ashita>\addons\BuffTrack`.
 3. In game, run `/addon load bufftrack`.
 4. To load it at startup, add `/addon load bufftrack` to your Ashita default script.
