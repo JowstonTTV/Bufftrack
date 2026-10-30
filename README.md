@@ -22,7 +22,6 @@ Other highlights:
 - **Audio cues** per tracker (Grid / Cures / Watch), with a preview button next to every sound picker.
 - **Party tab** for player-centric setup: pick a player, see and edit their assigned buffs and Cures overrides.
 - **Profiles** to save, load, and undo whole setups.
-- **Job icons** (3 styles) and an optional dark-and-gold config theme.
 - Passive only: the addon does not send outgoing packets.
 
 ## Installation
@@ -61,12 +60,3 @@ Run `/bufftrack` to open the configuration window (tabs: Behavior, Buffs, Party,
 - Erase's removal message for Watch alerts is not yet confirmed. Dispel has been verified live.
 - Grid excludes Ability-type buffs.
 - Watch is action-packet based, so enemy abilities with IDs below 256 are not handled.
-- Party-tab job icons rely on an Ashita API call not yet verified on every build.
-
-## Credits
-
-Third-party components are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
-
-## License
-
-[MIT](LICENSE)
