@@ -201,9 +201,9 @@ end
 
 local function PrintCandidates(label, candidates)
     if (#candidates == 0) then
-        Error(string.format('No match found for $H%s$R.', label));
+        Error(string.format('No match found for {%s}.', label));
     else
-        Error(string.format('$H%s$R is ambiguous. Closest matches:', label));
+        Error(string.format('{%s} is ambiguous. Closest matches:', label));
         for _,c in ipairs(candidates) do
             print(chat.header('BuffTrack') .. chat.message('  ' .. c));
         end
@@ -226,9 +226,9 @@ local function HandleAdd(buffQuery, playerQuery)
 
     local added = assignmentTracker.AddAssignment(buffMatch.ActionType, buffMatch.ActionId, buffMatch.BuffId, playerMatch);
     if added then
-        Message(string.format('Now tracking $H%s$R on $H%s$R.', buffMatch.Label, playerMatch));
+        Message(string.format('Now tracking {%s} on {%s}.', buffMatch.Label, playerMatch));
     else
-        Error(string.format('$H%s$R is already being tracked on $H%s$R.', buffMatch.Label, playerMatch));
+        Error(string.format('{%s} is already being tracked on {%s}.', buffMatch.Label, playerMatch));
     end
 end
 
@@ -239,7 +239,7 @@ local function HandleClearBuff(buffQuery)
         return;
     end
     assignmentTracker.RemoveColumn(buffMatch.ActionType, buffMatch.ActionId);
-    Message(string.format('Cleared all tracking for $H%s$R.', buffMatch.Label));
+    Message(string.format('Cleared all tracking for {%s}.', buffMatch.Label));
 end
 
 local function HandleClearPlayer(playerQuery)
@@ -250,7 +250,7 @@ local function HandleClearPlayer(playerQuery)
         return;
     end
     assignmentTracker.RemoveRow(match);
-    Message(string.format('Cleared all tracking for $H%s$R.', match));
+    Message(string.format('Cleared all tracking for {%s}.', match));
 end
 
 --kindArg: 'spell', 'ability', or 'mobskill' (optional -- if omitted, tries
@@ -297,9 +297,9 @@ local function HandleWatch(kindArg, nameQuery)
 
     local added = dispellableTracker.AddWatch(match.ActionType, match.ActionId, match.Label);
     if added then
-        Message(string.format('Now watching for $H%s$R cast by enemies.', match.Label));
+        Message(string.format('Now watching for {%s} cast by enemies.', match.Label));
     else
-        Error(string.format('$H%s$R is already on the watch list.', match.Label));
+        Error(string.format('{%s} is already on the watch list.', match.Label));
     end
 end
 
@@ -343,7 +343,7 @@ local function HandleUnwatch(nameQuery)
     end
 
     dispellableTracker.RemoveWatch(match.ActionType, match.ActionId);
-    Message(string.format('Removed $H%s$R from the watch list.', match.Label));
+    Message(string.format('Removed {%s} from the watch list.', match.Label));
 end
 
 --/bufftrack profile list|save|load|delete|undo -- see libs/profiles.lua.

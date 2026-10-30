@@ -4,7 +4,7 @@
     BuffTrack's sole renderer. Header bars are rounded GDI rectangles
     (gdi:create_rect) showing the buff's status icon (via gTextureCache's
     STATUS: texture-cache convention), name, and MP cost; cell fills use
-    vendored bar/outline PNG textures (clipped horizontally by
+    bar/outline PNG textures (clipped horizontally by
     percent-remaining, blended per state) rather than flat colored rects;
     tooltips use a font-object "background" sub-table for an auto-sized
     rounded box.
@@ -116,11 +116,11 @@ function renderer:New()
     o.HitBoxes = T{};
     o.HeaderLabels = {};
 
-    --Reuses the vendored bar/outline assets in resources/skins/grid/assets/.
+    --Bar/outline textures in resources/skins/grid/assets/.
     --Outline is tinted black as a background frame; Bar is tinted per-state
     --and clipped horizontally to represent percent remaining.
-    o.Bar = gTextureCache:GetTexture('skins/grid/assets/bar_windower.png');
-    o.Outline = gTextureCache:GetTexture('skins/grid/assets/outline_windower.png');
+    o.Bar = gTextureCache:GetTexture('skins/grid/assets/bar.png');
+    o.Outline = gTextureCache:GetTexture('skins/grid/assets/outline.png');
     if (o.Bar == nil) or (o.Outline == nil) then
         Error('BuffTrack: failed to load bar/outline textures; cells will render without a fill.');
     else
@@ -432,15 +432,15 @@ function renderer:DrawGrid(sprite, position, columns, hoveredIdentity)
             durationLabel:render(sprite);
 
             --Hover highlight (click-to-cast, see gridgroup.lua) -- a
-            --subtle translucent overlay with a gold outline (the config
-            --theme's accent color) on top of everything else in the
+            --subtle translucent overlay with an accent-colored outline (the
+            --config theme's bright accent tint) on top of everything else in the
             --cell, drawn only for the ONE cell matching hoveredIdentity
             --(nil whenever the feature's off or nothing's hovered, so
             --this never draws unless clicking would actually do
             --something).
             if (hoveredIdentity) and (cell.ActionType == hoveredIdentity.ActionType) and (cell.ActionId == hoveredIdentity.ActionId) and (cell.TargetName == hoveredIdentity.TargetName) then
                 if (not self.HoverRect) then
-                    self.HoverRect = gdi:create_rect({ fill_color = 0x28FFFFFF, outline_color = 0xFFF4DA97, outline_width = 1, corner_rounding = 2 }, true);
+                    self.HoverRect = gdi:create_rect({ fill_color = 0x28FFFFFF, outline_color = 0xFF9EA0FF, outline_width = 1, corner_rounding = 2 }, true);
                 end
                 self.HoverRect:set_width(colWidth);
                 self.HoverRect:set_height(rowHeight);

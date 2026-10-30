@@ -1,54 +1,106 @@
 --[[
     libs/uiskin.lua
 
-    Config window theme -- dark background with a warm gold accent,
-    mirrored directly from XIUI's config.lua PushThemeStyles/PopThemeStyles
-    (same palette, same ImGuiCol_*/ImGuiStyleVar_* set, same push/pop
-    counts) rather than reinvented, per explicit instruction to match that
-    look. Layout is NOT copied, only the color theme.
+    Config window theme (dark, cool-tinted, deep-blue accent) plus job icon
+    helpers.
 
-    This replaces an earlier, abandoned attempt at a custom PNG background
-    (stretched fill + 4-piece frame overlay via draw_list:AddImage) -- that
-    technique worked mechanically (confirmed working: background rendered),
-    but the frame art didn't align with the actual widget layout and was
-    dropped in favor of this pure color-theme approach instead. Job icon
-    lookup (GetJobIcon/DrawInlineIcon) is unrelated to that abandoned
-    background work and is kept -- still needed for the party-centric
-    picker.
+    The whole palette is derived from ONE accent color (ACCENT_HEX below):
+    its hue is extracted and every other shade is generated from that hue at
+    load, so re-theming means changing a single number. The raw accent is
+    deliberately dark, so it is only used as a FILL (selected tab, active
+    title bar, pressed button). Text, check marks and other small accents use
+    a lighter tint of the same hue (accentBright/accentMid) -- the raw accent
+    on the dark window background has a contrast ratio of only ~1.3:1 and
+    would be invisible there.
 ]]--
 
 local exports = {};
 local imgui = require('imgui');
 local ffi = require('ffi');
 
---Palette -- identical values to XIUI's own (see header comment for why:
---explicit "just mirror this" instruction, not a reinterpretation).
-local gold = { 0.957, 0.855, 0.592, 1.0 };           --#F4DA97 primary accent
-local goldDark = { 0.765, 0.684, 0.474, 1.0 };       --#C3AE79 darker gold, hover
-local goldDarker = { 0.573, 0.512, 0.355, 1.0 };     --#92835B even darker gold
-local bgDark = { 0.051, 0.051, 0.051, 0.95 };        --#0D0D0D deep black background
-local bgMedium = { 0.098, 0.090, 0.075, 1.0 };       --#191713 slightly warm dark
-local bgLight = { 0.137, 0.125, 0.106, 1.0 };        --#23201B lighter warm dark
-local bgLighter = { 0.176, 0.161, 0.137, 1.0 };      --#2D2923 highlight dark
-local textLight = { 0.878, 0.855, 0.812, 1.0 };      --#E0DACF warm off-white text
-local borderDark = { 0.3, 0.275, 0.235, 1.0 };       --#4D463C warm dark border
+--The one input to the theme: 0xRRGGBB.
+local ACCENT_HEX = 0x070980;
 
-local tabActiveColor = { gold[1], gold[2], gold[3], 0.3 };
-local headerActiveColor = { gold[1], gold[2], gold[3], 0.3 };
+local function HexToRGB(hex)
+    return { math.floor(hex / 65536) % 256 / 255, math.floor(hex / 256) % 256 / 255, hex % 256 / 255 };
+end
 
---Exposed so config.lua can reuse the exact accent color for
---imgui.TextColored(...) section headers, rather than keeping its own
---separate hardcoded orange -- one source of truth for "the accent color".
-exports.HeaderColor = gold;
-exports.TextColor = textLight;
+--Hue only (0-1) -- saturation/value are chosen per shade below.
+local function RGBToHue(c)
+    local r, g, b = c[1], c[2], c[3];
+    local mx, mn = math.max(r, g, b), math.min(r, g, b);
+    local d = mx - mn;
+    if (d == 0) then
+        return 0;
+    end
+    local h;
+    if (mx == r) then
+        h = ((g - b) / d) % 6;
+    elseif (mx == g) then
+        h = ((b - r) / d) + 2;
+    else
+        h = ((r - g) / d) + 4;
+    end
+    return h / 6;
+end
 
---Every available job icon style (resources/jobs/<style>/<abbr>.png sets).
---Used by config.lua's Behavior tab picker -- dropped by accident when
---this file was rewritten from the background-image version to the
---pure-theme version (everything else in that rewrite was intentional;
---this one just got left out), which crashed the Behavior tab's Job Icon
---Style combo the moment it tried to iterate a nil list.
-exports.JobIconStyles = { 'Classic', 'FFXI', 'FFXIV-1' };
+--h, s, v in 0-1 -> { r, g, b, a }.
+local function HSV(h, s, v, a)
+    local scaled = h * 6;
+    local i = math.floor(scaled);
+    local f = scaled - i;
+    local p = v * (1 - s);
+    local q = v * (1 - (f * s));
+    local t = v * (1 - ((1 - f) * s));
+    local r, g, b;
+    i = i % 6;
+    if (i == 0) then r, g, b = v, t, p;
+    elseif (i == 1) then r, g, b = q, v, p;
+    elseif (i == 2) then r, g, b = p, v, t;
+    elseif (i == 3) then r, g, b = p, q, v;
+    elseif (i == 4) then r, g, b = t, p, v;
+    else r, g, b = v, p, q;
+    end
+    return { r, g, b, a or 1.0 };
+end
+
+--Palette, all generated from ACCENT_HEX's hue.
+local rawAccent = HexToRGB(ACCENT_HEX);
+local hue = RGBToHue(rawAccent);
+
+local accent       = { rawAccent[1], rawAccent[2], rawAccent[3], 1.0 }; --fills only
+local accentBright = HSV(hue, 0.38, 1.00);  --text accents, check marks
+local accentMid    = HSV(hue, 0.55, 0.90);  --disabled text, slider grab
+local accentDim    = HSV(hue, 0.80, 0.65);  --hover fills
+local bgDark       = HSV(hue, 0.30, 0.07, 0.95);
+local bgMedium     = HSV(hue, 0.28, 0.11);
+local bgLight      = HSV(hue, 0.26, 0.16);
+local bgLighter    = HSV(hue, 0.24, 0.22);
+local borderColor  = HSV(hue, 0.35, 0.42);
+local textColor    = HSV(hue, 0.05, 0.92);
+local gripColor    = HSV(hue, 0.80, 0.65, 0.50);
+
+--Exposed so config.lua can reuse the exact accent for
+--imgui.TextColored(...) section headers -- one source of truth for "the
+--accent color".
+exports.HeaderColor = accentBright;
+exports.TextColor = textColor;
+
+--Job icon sets shipped in resources/jobs/<style>/<abbr>.png.
+--Used by config.lua's Behavior tab picker.
+exports.JobIconStyles = { 'Role', 'Outline' };
+exports.DefaultJobIconStyle = 'Role';
+
+--Maps any saved style name (including one from an older version whose icon
+--set no longer ships) onto a style that exists.
+function exports:ResolveJobIconStyle(style)
+    for _,name in ipairs(self.JobIconStyles) do
+        if (name == style) then
+            return style;
+        end
+    end
+    return self.DefaultJobIconStyle;
+end
 
 --Running counts of how many pushes ACTUALLY succeeded this call to
 --PushTheme -- PopTheme pops exactly these counts, never a hardcoded
@@ -58,16 +110,11 @@ exports.JobIconStyles = { 'Classic', 'FFXI', 'FFXIV-1' };
 local pushedColorCount = 0;
 local pushedVarCount = 0;
 
---Safe wrapper around a single PushStyleColor/PushStyleVar call -- the
---first reported crash was an UNWRAPPED call throwing straight out of
---PushTheme and unloading the whole addon; this can't happen again
---regardless of which specific enum/value turns out to be the problem.
---Prints the real error text ONCE PER DISTINCT LABEL (not once total) --
---the first version only ever reported the very first failure, so if
---several different pushes were failing for different reasons, only one
---was ever visible; this way each distinct failing push gets its own
---report, still capped so a systemic failure (e.g. every single push
---rejected) can't spam the chat log once per push every frame.
+--Safe wrapper around a single PushStyleColor/PushStyleVar call, so one
+--rejected enum/value can't throw out of PushTheme and unload the addon.
+--Reports the real error text once per distinct label (not once total, and
+--not every frame), so several different failing pushes are each visible
+--without spamming the chat log.
 local warnedLabels = {};
 local function TryPush(label, fn, a, b)
     local ok, err = pcall(fn, a, b);
@@ -79,46 +126,53 @@ local function TryPush(label, fn, a, b)
 end
 
 --Pushes the full theme -- MUST be paired with a PopTheme() call, always,
---even on an early-out path (same always-call-End() reasoning used
---elsewhere in this project for imgui.End()). Call this BEFORE
---SetNextWindowSize/Begin, same order XIUI's own DrawProfilesWindow/
---config window does it in.
+--even on an early-out path (same always-call-End() reasoning as
+--imgui.End()). Call this BEFORE SetNextWindowSize/Begin.
 function exports:PushTheme()
     pushedColorCount = 0;
     pushedVarCount = 0;
 
-    --NOTE: ChildBg/FrameBg*/Header* are DELIBERATELY not themed. First
-    --test of this theme broke the Buffs tab's spell list (list not
-    --rendering, typing in the filter box doing nothing) -- those three
-    --groups are exactly what Selectable (Header/HeaderHovered/
-    --HeaderActive), InputText (FrameBg/FrameBgHovered/FrameBgActive), and
-    --BeginChild (ChildBg, previously pushed fully transparent -- an
-    --unusual value that could misbehave in a less-common binding's
-    --scroll/clip handling) actually use, and the Buffs tab's list is built
-    --from exactly those three widgets. Left at ImGui's own defaults rather
-    --than guessed at a second time; everything else (window/tab/border/
-    --text/button colors) keeps the theme.
+    --NOTE: ChildBg/FrameBg*/Header* are deliberately NOT themed here -- the
+    --Buffs tab's spell list is built from exactly those widget groups
+    --(Selectable, InputText, BeginChild), and an earlier theme pass that
+    --touched them broke that list. They stay at ImGui's defaults until
+    --they're added back one group at a time and tested.
     local colors = {
+        --Window chrome
         { 'WindowBg', ImGuiCol_WindowBg, bgDark },
-        { 'TitleBg', ImGuiCol_TitleBg, bgMedium }, { 'TitleBgActive', ImGuiCol_TitleBgActive, bgLight },
+        { 'PopupBg', ImGuiCol_PopupBg, bgMedium },
+        { 'Border', ImGuiCol_Border, borderColor },
+        { 'Separator', ImGuiCol_Separator, borderColor },
+        { 'TitleBg', ImGuiCol_TitleBg, bgMedium },
+        { 'TitleBgActive', ImGuiCol_TitleBgActive, accent },
         { 'TitleBgCollapsed', ImGuiCol_TitleBgCollapsed, bgDark },
-        { 'Border', ImGuiCol_Border, borderDark },
-        { 'Text', ImGuiCol_Text, textLight }, { 'TextDisabled', ImGuiCol_TextDisabled, goldDark },
-        { 'Button', ImGuiCol_Button, bgMedium }, { 'ButtonHovered', ImGuiCol_ButtonHovered, bgLight },
-        { 'ButtonActive', ImGuiCol_ButtonActive, bgLighter }, { 'CheckMark', ImGuiCol_CheckMark, gold },
-        { 'SliderGrab', ImGuiCol_SliderGrab, goldDark }, { 'SliderGrabActive', ImGuiCol_SliderGrabActive, gold },
-        { 'ScrollbarBg', ImGuiCol_ScrollbarBg, bgMedium }, { 'ScrollbarGrab', ImGuiCol_ScrollbarGrab, bgLighter },
-        { 'ScrollbarGrabHovered', ImGuiCol_ScrollbarGrabHovered, borderDark }, { 'ScrollbarGrabActive', ImGuiCol_ScrollbarGrabActive, goldDark },
-        { 'Separator', ImGuiCol_Separator, borderDark }, { 'PopupBg', ImGuiCol_PopupBg, bgMedium },
-        { 'Tab', ImGuiCol_Tab, bgMedium }, { 'TabHovered', ImGuiCol_TabHovered, bgLight },
-        --Renamed in Dear ImGui v1.90.9 (TabActive->TabSelected,
-        --TabUnfocused->TabDimmed, TabUnfocusedActive->TabDimmedSelected) --
-        --confirmed via the official release notes, not a guess: these were
-        --the exact 3 (and only 3) pushes that failed under the old names,
-        --every other color succeeded on the first try.
-        { 'TabSelected', ImGuiCol_TabSelected, tabActiveColor }, { 'TabDimmed', ImGuiCol_TabDimmed, bgDark },
-        { 'TabDimmedSelected', ImGuiCol_TabDimmedSelected, bgMedium }, { 'ResizeGrip', ImGuiCol_ResizeGrip, goldDarker },
-        { 'ResizeGripHovered', ImGuiCol_ResizeGripHovered, goldDark }, { 'ResizeGripActive', ImGuiCol_ResizeGripActive, gold },
+        --Text
+        { 'Text', ImGuiCol_Text, textColor },
+        { 'TextDisabled', ImGuiCol_TextDisabled, accentMid },
+        --Buttons / inputs
+        { 'Button', ImGuiCol_Button, bgLight },
+        { 'ButtonHovered', ImGuiCol_ButtonHovered, accentDim },
+        { 'ButtonActive', ImGuiCol_ButtonActive, accent },
+        { 'CheckMark', ImGuiCol_CheckMark, accentBright },
+        { 'SliderGrab', ImGuiCol_SliderGrab, accentMid },
+        { 'SliderGrabActive', ImGuiCol_SliderGrabActive, accentBright },
+        --Scrollbars
+        { 'ScrollbarBg', ImGuiCol_ScrollbarBg, bgMedium },
+        { 'ScrollbarGrab', ImGuiCol_ScrollbarGrab, bgLighter },
+        { 'ScrollbarGrabHovered', ImGuiCol_ScrollbarGrabHovered, borderColor },
+        { 'ScrollbarGrabActive', ImGuiCol_ScrollbarGrabActive, accentDim },
+        --Tabs. Dear ImGui v1.90.9 renamed TabActive->TabSelected,
+        --TabUnfocused->TabDimmed, TabUnfocusedActive->TabDimmedSelected;
+        --the new names are the ones that resolve in this environment.
+        { 'Tab', ImGuiCol_Tab, bgMedium },
+        { 'TabHovered', ImGuiCol_TabHovered, accentDim },
+        { 'TabSelected', ImGuiCol_TabSelected, accent },
+        { 'TabDimmed', ImGuiCol_TabDimmed, bgDark },
+        { 'TabDimmedSelected', ImGuiCol_TabDimmedSelected, bgLight },
+        --Resize grip
+        { 'ResizeGrip', ImGuiCol_ResizeGrip, gripColor },
+        { 'ResizeGripHovered', ImGuiCol_ResizeGripHovered, accentMid },
+        { 'ResizeGripActive', ImGuiCol_ResizeGripActive, accentBright },
     };
     for _,c in ipairs(colors) do
         if (TryPush('Color:' .. c[1], imgui.PushStyleColor, c[2], c[3])) then
@@ -127,11 +181,15 @@ function exports:PushTheme()
     end
 
     local vars = {
-        { 'WindowPadding', ImGuiStyleVar_WindowPadding, { 12, 12 } }, { 'FramePadding', ImGuiStyleVar_FramePadding, { 6, 4 } },
-        { 'ItemSpacing', ImGuiStyleVar_ItemSpacing, { 8, 6 } }, { 'FrameRounding', ImGuiStyleVar_FrameRounding, 4.0 },
-        { 'WindowRounding', ImGuiStyleVar_WindowRounding, 6.0 }, { 'ChildRounding', ImGuiStyleVar_ChildRounding, 4.0 },
-        { 'PopupRounding', ImGuiStyleVar_PopupRounding, 4.0 }, { 'ScrollbarRounding', ImGuiStyleVar_ScrollbarRounding, 4.0 },
-        { 'GrabRounding', ImGuiStyleVar_GrabRounding, 4.0 },
+        { 'WindowPadding', ImGuiStyleVar_WindowPadding, { 10, 10 } },
+        { 'FramePadding', ImGuiStyleVar_FramePadding, { 5, 3 } },
+        { 'ItemSpacing', ImGuiStyleVar_ItemSpacing, { 6, 5 } },
+        { 'WindowRounding', ImGuiStyleVar_WindowRounding, 3.0 },
+        { 'ChildRounding', ImGuiStyleVar_ChildRounding, 2.0 },
+        { 'FrameRounding', ImGuiStyleVar_FrameRounding, 2.0 },
+        { 'PopupRounding', ImGuiStyleVar_PopupRounding, 2.0 },
+        { 'ScrollbarRounding', ImGuiStyleVar_ScrollbarRounding, 2.0 },
+        { 'GrabRounding', ImGuiStyleVar_GrabRounding, 2.0 },
     };
     for _,v in ipairs(vars) do
         if (TryPush('Var:' .. v[1], imgui.PushStyleVar, v[2], v[3])) then
@@ -142,8 +200,7 @@ end
 
 --Pops EXACTLY as many as PushTheme actually pushed this time -- never a
 --hardcoded count -- so a partial push failure can't unbalance ImGui's
---style stack (which a mismatched Pop count would, likely surfacing as an
---even more confusing downstream error later in the same session).
+--style stack.
 function exports:PopTheme()
     if (pushedVarCount > 0) then
         imgui.PopStyleVar(pushedVarCount);
@@ -165,8 +222,7 @@ local function LoadTexture(path)
 end
 
 --Converts a raw D3D texture handle into the numeric texture id
---draw_list:AddImage expects -- confirmed technique, sourced from a real
---working reference addon (see DrawInlineIcon's comment).
+--draw_list:AddImage expects.
 local function ToTextureId(textureHandle)
     if (textureHandle == nil) then
         return nil;
@@ -188,21 +244,17 @@ function exports:GetJobIcon(jobAbbr, styleOverride)
     if (jobAbbr == nil) then
         return nil;
     end
-    local style = styleOverride or gSettings.JobIconStyle or 'FFXI';
+    local style = self:ResolveJobIconStyle(styleOverride or gSettings.JobIconStyle);
     return LoadTexture(string.format('jobs/%s/%s.png', style, string.lower(jobAbbr)));
 end
 
 --Draws an arbitrary loaded texture inline in normal ImGui widget flow --
 --e.g. `imgui.SameLine(); uiskin:DrawInlineIcon(tex, 32, 32);`. Uses
---draw_list:AddImage (a pure draw primitive, absolute screen coordinates,
---confirmed working via a real reference addon -- see this file's header
---comment) rather than imgui.Image (which turned out to be the wrong
---function entirely during the abandoned background-art attempt: wrong
---arg count, wrong texture-id format, and it silently misbehaves with
---ImGui's layout cursor in a way AddImage doesn't). Manually advances the
---layout cursor afterward (via a same-sized Dummy) so subsequent
---SameLine()/normal layout calls behave as if a regular widget had been
---drawn, since AddImage itself never touches layout on its own.
+--draw_list:AddImage (absolute screen coordinates; imgui.Image does not
+--take the texture-id format used here) and manually advances the layout
+--cursor afterward via a same-sized Dummy, since AddImage never touches
+--layout on its own -- so subsequent SameLine()/normal layout calls behave
+--as if a regular widget had been drawn.
 function exports:DrawInlineIcon(texture, width, height)
     if (texture == nil) then
         return;

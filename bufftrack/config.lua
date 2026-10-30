@@ -19,7 +19,7 @@ local spellDescriptions = require('libs.spelldescriptions');
 local sounds = require('libs.sounds');
 local uiskin = require('libs.uiskin');
 local profiles = require('libs.profiles');
---Shared with uiskin's own theme (gold accent) rather than a separate
+--Shared with uiskin's own theme (accent color) rather than a separate
 --hardcoded color, so section headers match the rest of the window's
 --palette instead of clashing with it.
 local header = uiskin.HeaderColor;
@@ -296,14 +296,14 @@ function config:DrawBehaviorTab()
             gSettings.GridClickToCast = clickCastBuffer[1];
             settings.save();
         end
-        imgui.ShowHelp('Click a Grid cell to cast that buff on that player. Plain click: only casts when the buff is NOT currently active. Ctrl+click: casts regardless of current state (even if still active). Alt+click (Entry Editor) and Shift+click (remove) are unchanged. Hovering a cell shows a highlight while this is on. Off by default -- a misclick here is a real cast, not a cosmetic change. Sends a normal /ma command through the game\'s own command queue, same as typing it yourself or clicking a macro.');
+        imgui.ShowHelp('Click a Grid cell to cast that buff on that player. Plain click: only casts when the buff is flashing (about to expire or just expired) or NOT currently active. Ctrl+click: casts regardless of current state (even if still active). Alt+click (Entry Editor) and Shift+click (remove) are unchanged. Hovering a cell shows a highlight while this is on. Off by default -- a misclick here is a real cast, not a cosmetic change. Sends a normal /ma command through the game\'s own command queue, same as typing it yourself or clicking a macro.');
 
         imgui.TextColored(header, 'Job Icon Style');
         imgui.ShowHelp('Which resources/jobs/ set to pull job icons from, for the party-centric picker.');
         imgui.SetNextItemWidth(160);
-        if imgui.BeginCombo('##BuffTrackJobIconStylePick', gSettings.JobIconStyle or 'FFXI') then
+        if imgui.BeginCombo('##BuffTrackJobIconStylePick', uiskin:ResolveJobIconStyle(gSettings.JobIconStyle)) then
             for _,styleName in ipairs(uiskin.JobIconStyles) do
-                if imgui.Selectable(string.format('%s##BuffTrackJobIconStyleOption%s', styleName, styleName), (gSettings.JobIconStyle == styleName)) then
+                if imgui.Selectable(string.format('%s##BuffTrackJobIconStyleOption%s', styleName, styleName), (uiskin:ResolveJobIconStyle(gSettings.JobIconStyle) == styleName)) then
                     gSettings.JobIconStyle = styleName;
                     settings.save();
                 end
@@ -1385,12 +1385,9 @@ function config:Render()
     self:RenderAddCuresPopup();
     local state = self.State;
     if (state.IsOpen[1]) then
-        --Dark+gold theme, mirrored from XIUI's config.lua (see
-        --libs/uiskin.lua's header comment) -- replaces an earlier,
-        --abandoned attempt at a custom PNG background (worked mechanically
-        --but the frame art didn't align with the actual widget layout).
-        --PushTheme() is called BEFORE SetNextWindowSize/Begin, same order
-        --the reference addon uses; PopTheme() is called unconditionally
+        --Dark theme with a single derived accent color (see
+        --libs/uiskin.lua). PushTheme() is called BEFORE
+        --SetNextWindowSize/Begin; PopTheme() is called unconditionally
         --after End(), same always-call reasoning as End() itself below.
         uiskin:PushTheme();
 

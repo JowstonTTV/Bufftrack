@@ -1,69 +1,115 @@
-local function ParseActionPacket(e)
-    local bitData;
-    local bitOffset;
-    local function UnpackBits(length)
-        local value = ashita.bits.unpack_be(bitData, 0, bitOffset, length);
-        bitOffset = bitOffset + length;
+--[[
+    actionpacket.lua
+
+    Decodes the server's "action" packet (0x028: spell casts, abilities,
+    weapon skills and their results) into a Lua table.
+
+    The packet is a bit-packed stream, so decoding is a matter of reading
+    fields of known widths in order. The layout below is the wire format;
+    the output field names are what the trackers use:
+
+        packet.UserId, packet.Type, packet.Id, packet.Recast
+        packet.Targets[n].Id
+        packet.Targets[n].Actions[m].Reaction / Animation / SpecialEffect /
+            Knockback / Param / Message / Flags
+            plus .AdditionalEffect and .SpikesEffect when present
+            ({ Damage, Param, Message })
+]]--
+
+--Field lists: { name, width in bits }, read in order.
+local HEADER_SKIP_BITS = 40;   --packet id/size/sync header
+
+local actionFields = {
+    { 'Reaction', 5 },
+    { 'Animation', 12 },
+    { 'SpecialEffect', 7 },
+    { 'Knockback', 3 },
+    { 'Param', 17 },
+    { 'Message', 10 },
+    { 'Flags', 31 },
+};
+
+local additionalEffectFields = {
+    { 'Damage', 10 },
+    { 'Param', 17 },
+    { 'Message', 10 },
+};
+
+local spikesEffectFields = {
+    { 'Damage', 10 },
+    { 'Param', 14 },
+    { 'Message', 10 },
+};
+
+--Sequential big-endian bit reader over the raw packet bytes.
+local function NewReader(raw, startBit)
+    local position = startBit;
+    local reader = {};
+
+    function reader.Read(width)
+        local value = ashita.bits.unpack_be(raw, 0, position, width);
+        position = position + width;
         return value;
     end
 
-    local actionPacket = T{};
-    bitData = e.data_raw;
-    bitOffset = 40;
-    actionPacket.UserId = UnpackBits(32);
-    local targetCount = UnpackBits(6);
-    bitOffset = bitOffset + 4;
-    actionPacket.Type = UnpackBits(4);
-    actionPacket.Id = UnpackBits(17);
-    bitOffset = bitOffset + 15;
-    actionPacket.Recast = UnpackBits(32);
-    
-    actionPacket.Targets = T{};
-    for i = 1,targetCount do
-        local target = T{};
-        target.Id = UnpackBits(32);
-        local actionCount = UnpackBits(4);
-        target.Actions = T{};
-        for j = 1,actionCount do
-            local action = {};
-            action.Reaction = UnpackBits(5);
-            action.Animation = UnpackBits(12);
-            action.SpecialEffect = UnpackBits(7);
-            action.Knockback = UnpackBits(3);
-            action.Param = UnpackBits(17);
-            action.Message = UnpackBits(10);
-            action.Flags = UnpackBits(31);
-
-            local hasAdditionalEffect = (UnpackBits(1) == 1);
-            if hasAdditionalEffect then
-                local additionalEffect = {};
-                additionalEffect.Damage = UnpackBits(10);
-                additionalEffect.Param = UnpackBits(17);
-                additionalEffect.Message = UnpackBits(10);
-                action.AdditionalEffect = additionalEffect;
-            end
-
-            local hasSpikesEffect = (UnpackBits(1) == 1);
-            if hasSpikesEffect then
-                local spikesEffect = {};
-                spikesEffect.Damage = UnpackBits(10);
-                spikesEffect.Param = UnpackBits(14);
-                spikesEffect.Message = UnpackBits(10);
-                action.SpikesEffect = spikesEffect;
-            end
-
-            target.Actions:append(action);
-        end
-        actionPacket.Targets:append(target);
+    function reader.Skip(width)
+        position = position + width;
     end
 
-    return actionPacket;
+    --Reads each { name, width } field into a new table.
+    function reader.ReadFields(fields)
+        local result = {};
+        for _,field in ipairs(fields) do
+            result[field[1]] = reader.Read(field[2]);
+        end
+        return result;
+    end
+
+    return reader;
+end
+
+local function ReadAction(reader)
+    local action = reader.ReadFields(actionFields);
+    if (reader.Read(1) == 1) then
+        action.AdditionalEffect = reader.ReadFields(additionalEffectFields);
+    end
+    if (reader.Read(1) == 1) then
+        action.SpikesEffect = reader.ReadFields(spikesEffectFields);
+    end
+    return action;
+end
+
+local function Parse(e)
+    local reader = NewReader(e.data_raw, HEADER_SKIP_BITS);
+
+    local packet = T{};
+    packet.UserId = reader.Read(32);
+    local targetCount = reader.Read(6);
+    reader.Skip(4);
+    packet.Type = reader.Read(4);
+    packet.Id = reader.Read(17);
+    reader.Skip(15);
+    packet.Recast = reader.Read(32);
+
+    packet.Targets = T{};
+    for _ = 1, targetCount do
+        local target = T{};
+        target.Id = reader.Read(32);
+        local actionCount = reader.Read(4);
+        target.Actions = T{};
+        for _ = 1, actionCount do
+            target.Actions:append(ReadAction(reader));
+        end
+        packet.Targets:append(target);
+    end
+
+    return packet;
 end
 
 local exports = {};
 
 function exports:parse(e)
-    return ParseActionPacket(e);
+    return Parse(e);
 end
 
 return exports;

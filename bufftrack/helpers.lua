@@ -1,97 +1,91 @@
 --[[
     helpers.lua
 
-    General-purpose helpers required at bootstrap (bufftrack.lua) --
-    Error/Message chat output, resource-file path resolution, and
+    Bootstrap helpers required by bufftrack.lua: chat output (Message /
+    Error), resource-path lookup (GetFilePath / GetImagePath) and
     SnapPosition (panel snap-to-align, see below).
+
+    Chat text can mark a highlighted span with braces: the text between
+    { and } is drawn in the highlight color, e.g.
+        Message(string.format('Now tracking {%s}.', name));
 ]]--
 
 local chat = require('chat');
 
-function Error(text)
-    local stripped = string.gsub(text, '$H', ''):gsub('$R', '');
-    LogManager:Log(1, addon.name, stripped);
-    local color = ('\30%c'):format(68);
-    local highlighted = color .. string.gsub(text, '$H', '\30\01\30\02');
-    highlighted = string.gsub(highlighted, '$R', '\30\01' .. color);
-    print(chat.header(addon.name) .. highlighted .. '\30\01');
+--FFXI chat color codes.
+local COLOR_INFO      = 106;
+local COLOR_ERROR     = 68;
+local COLOR_HIGHLIGHT = 2;
+
+local LOG_LEVEL_ERROR = 1;
+local LOG_LEVEL_INFO  = 5;
+
+--Turns "plain {highlighted} plain" into one chat string with the matching
+--color codes, ending with a reset.
+local function Colorize(text, baseColor)
+    local pieces = {};
+    local color = baseColor;
+    local position = 1;
+    while (position <= #text) do
+        local braceStart, braceEnd = text:find('[{}]', position);
+        local chunkEnd = (braceStart or (#text + 1)) - 1;
+        if (chunkEnd >= position) then
+            pieces[#pieces + 1] = ('\30%c'):format(color) .. text:sub(position, chunkEnd);
+        end
+        if (braceStart == nil) then
+            break;
+        end
+        color = (text:sub(braceStart, braceStart) == '{') and COLOR_HIGHLIGHT or baseColor;
+        position = braceEnd + 1;
+    end
+    return table.concat(pieces) .. '\30\01';
 end
 
-function GetFilePath(path)
-    local potentialPaths = T{
-        path,
-        string.format('%sconfig/addons/%s/resources/%s', AshitaCore:GetInstallPath(), addon.name, path),
-        string.format('%saddons/%s/resources/%s', AshitaCore:GetInstallPath(), addon.name, path),
-    };
-
-    for _,potentialPath in ipairs(potentialPaths) do
-        if (potentialPath ~= '') and (ashita.fs.exists(potentialPath)) then
-            return potentialPath;
-        end
-    end
-end
-
-function GetImagePath(image, default)
-    if (string.sub(image, 1, 5) == 'ITEM:') then
-        return image;
-    end
-    
-    if (string.sub(image, 1, 7) == 'STATUS:') then
-        return image;
-    end
-    
-    local potentialPaths = T{
-        image,
-        string.format('%sconfig/addons/%s/resources/%s', AshitaCore:GetInstallPath(), addon.name, image),
-        string.format('%saddons/%s/resources/%s', AshitaCore:GetInstallPath(), addon.name, image),
-    };
-
-    for _,path in ipairs(potentialPaths) do
-        if (path ~= '') and (ashita.fs.exists(path)) then
-            return path;
-        end
-    end
-
-    return nil;
+local function Say(text, baseColor, logLevel)
+    LogManager:Log(logLevel, addon.name, (text:gsub('[{}]', '')));
+    print(chat.header(addon.name) .. Colorize(text, baseColor));
 end
 
 function Message(text)
-    local stripped = string.gsub(text, '$H', ''):gsub('$R', '');
-    LogManager:Log(5, addon.name, stripped);
-    local color = ('\30%c'):format(106);
-    local highlighted = color .. string.gsub(text, '$H', '\30\01\30\02');
-    highlighted = string.gsub(highlighted, '$R', '\30\01' .. color);
-    print(chat.header(addon.name) .. highlighted .. '\30\01');
+    Say(text, COLOR_INFO, LOG_LEVEL_INFO);
 end
 
-function LoadFile_s(filePath)
-    if (filePath == nil) then
-        return nil;
-    end
-    
-    if not ashita.fs.exists(filePath) then
+function Error(text)
+    Say(text, COLOR_ERROR, LOG_LEVEL_ERROR);
+end
+
+--Finds a bundled resource: the path as given, then the user's config copy,
+--then the addon's own resources folder. Returns nil if none exist.
+local function ResolveResource(relativePath)
+    if (relativePath == nil) or (relativePath == '') then
         return nil;
     end
 
-    local success, loadError = loadfile(filePath);
-    if not success then
-        Error(string.format('Failed to load resource file: $H%s', filePath));
-        if type(loadError) == 'string' then
-            Error(loadError);
+    local installPath = AshitaCore:GetInstallPath();
+    local candidates = {
+        relativePath,
+        string.format('%sconfig/addons/%s/resources/%s', installPath, addon.name, relativePath),
+        string.format('%saddons/%s/resources/%s', installPath, addon.name, relativePath),
+    };
+    for _,candidate in ipairs(candidates) do
+        if (ashita.fs.exists(candidate)) then
+            return candidate;
         end
-        return nil;
     end
+    return nil;
+end
 
-    local result, output = pcall(success);
-    if not result then
-        Error(string.format('Failed to execute resource file: $H%s', filePath));
-        if type(output) == 'string' then
-            Error(output);
-        end
-        return nil;
+function GetFilePath(path)
+    return ResolveResource(path);
+end
+
+--Image keys of the form ITEM:<id> / STATUS:<id> name game resources, not
+--files, and pass through untouched for texturecache.lua to handle.
+function GetImagePath(image)
+    if (image:find('^ITEM:')) or (image:find('^STATUS:')) then
+        return image;
     end
-
-    return output;
+    return ResolveResource(image);
 end
 
 --[[

@@ -48,8 +48,8 @@ local warnedCanCureFailure = false;
 --[[
     Direct 1:1 status->cure mappings, per user-supplied data (unlike Erase,
     which covers many different debuffs generically and is opt-in only --
-    see AddEraseEntry below). Status IDs per libs/bufftable.lua's
-    statusEffects numbering.
+    see AddEraseEntry below). Status IDs are the game's status-effect
+    numbering (see libs/statuseffects.lua).
         weakness=1, sleep=2, poison=3, paralysis=4, blindness=5, silence=6,
         petrification=7, disease=8, curse_i=9, curse_ii=20, plague=31
 

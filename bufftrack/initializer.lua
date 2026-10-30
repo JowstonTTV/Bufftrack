@@ -49,8 +49,8 @@ settings         = require('settings');
 
     CureMap(table) - Array of curable-debuff entries (see trackers/curable.lua).
     Entry:
-        StatusId(number)      - Debuff status-effect ID (see libs/bufftable.lua's
-                                 statusEffects for the game's numbering).
+        StatusId(number)      - Debuff status-effect ID (see libs/statuseffects.lua
+                                 for the game's numbering).
         ActionType(string)    - Always "Spell" for now (Poisona/Cursna/Erase/etc).
         ActionId(number)      - The curing spell's resource ID.
         RequiredJob(string)   - 3-letter job abbreviation, e.g. "WHM".
@@ -260,8 +260,7 @@ gDefaultSettings = T{
     --Per-tracker audio cues (SoundId keys into libs/sounds.lua's
     --Available list). Enabled defaults to false across the board -- audio
     --is opt-in, not a surprise the first time someone updates. AlarmVolume
-    --is 0-100, shared across every sound this addon plays (mirrors Eggs'
-    --own alarm_volume convention, which libs/sounds.lua is ported from).
+    --is 0-100, shared across every sound this addon plays.
     GridSound = { Enabled = false, SoundId = 'chime' },
     CuresSound = { Enabled = false, SoundId = 'bell' },
     WatchSound = { Enabled = false, SoundId = 'alarm' },
@@ -279,7 +278,7 @@ gDefaultSettings = T{
     --either mode.
     GridGroupBy = 'Buff',
     --Which resources/jobs/<style>/<abbr>.png set to pull job icons from.
-    JobIconStyle = 'FFXI',
+    JobIconStyle = 'Role',
     --Click-to-cast (gridgroup.lua's HandleMouse/TryClickCast) -- off by
     --default, per explicit decision (unlike every other toggle in this
     --project, a misclick here has a real consequence -- an actual cast --
@@ -336,9 +335,10 @@ gCuresPanel = alertsGroup.NewCuresPanel(gSettings);
 gWatchPanel = alertsGroup.NewWatchPanel(gSettings);
 
 --Initialize audio cues (see libs/sounds.lua) -- resolves resources/Sounds/
---file paths and stands up DirectSound (falling back to
---ashita.misc.play_sound if that fails) once at load, rather than lazily on
---first Play call, so any "Sound missing"/DirectSound-unavailable warnings
+--file paths and loads the WAV files into memory (falling back to
+--ashita.misc.play_sound at play time if winmm is unavailable) once at
+--load, rather than lazily on first Play call, so any "Sound missing"
+--warnings
 --surface immediately instead of at a random moment mid-session. gSounds is
 --global (same convention as gTextureCache) since every tracker that fires
 --a cue needs it (trackers/assignment.lua, trackers/curable.lua,

@@ -262,7 +262,7 @@ function renderer:DrawSection(sprite, x, y, width, scale, keyPrefix, title, rows
         --instead (added for its ByPlayer mode).
         local textStartX = x + padding;
         if (keyPrefix == 'cures') and (gSettings.CuresShowJobIcon) and (row.JobAbbr) then
-            local icon = gTextureCache:GetTexture(string.format('jobs/%s/%s.png', gSettings.JobIconStyle or 'FFXI', string.lower(row.JobAbbr)));
+            local icon = require('libs.uiskin'):GetJobIcon(row.JobAbbr);
             if (icon ~= nil) then
                 local iconSize = rowHeight - 2;
                 if (self.IconRect == nil) then

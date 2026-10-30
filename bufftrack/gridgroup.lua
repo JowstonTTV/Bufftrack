@@ -30,7 +30,8 @@
                             for this (no replacement binding assigned --
                             Shift-click single-cell removal and the Buffs
                             tab's Remove controls remain for bulk cleanup).
-      Plain click a cell -> click-to-cast, ONLY when NotActive -- see
+      Plain click a cell -> click-to-cast, ONLY when Attention (about to
+                            expire / flashing) or NotActive -- see
                             TryClickCast. Both click-to-cast bindings are
                             no-ops unless gSettings.GridClickToCast is on.
 ]]--
@@ -249,7 +250,7 @@ end
 
 --Click-to-cast (gSettings.GridClickToCast -- off by default, see
 --initializer.lua). forceIgnoreState=true (Ctrl-click) casts regardless of
---cell.State; false (plain click) only fires when cell.State=='NotActive',
+--cell.State; false (plain click) only fires when cell.State is 'Attention' (flashing) or 'NotActive',
 --so an accidental plain click can't interrupt/waste a buff that's still
 --mostly up. Sends `/ma "<spell>" <target>` via Ashita's own sanctioned
 --command queue (AshitaCore:GetChatManager():QueueCommand) -- the SAME
@@ -270,7 +271,7 @@ function GridGroup:TryClickCast(cell, forceIgnoreState)
     if (not gSettings.GridClickToCast) then
         return;
     end
-    if (not forceIgnoreState) and (cell.State ~= 'NotActive') then
+    if (not forceIgnoreState) and (cell.State ~= 'NotActive') and (cell.State ~= 'Attention') then
         return;
     end
 
@@ -284,7 +285,8 @@ function GridGroup:TryClickCast(cell, forceIgnoreState)
     ---- same field the header/tooltip already show, no separate lookup
     --needed. Quoted since multi-word spell names need it for /ma to parse
     --correctly.
-    local command = string.format('/ma "%s" %s', cell.ColumnLabel, cell.TargetName);
+    local verb = (cell.ActionType == 'Ability') and '/ja' or '/ma';
+    local command = string.format('%s "%s" %s', verb, cell.ColumnLabel, cell.TargetName);
     AshitaCore:GetChatManager():QueueCommand(1, command);
 end
 
@@ -336,7 +338,7 @@ function GridGroup:HandleMouse(e)
             end
         else
             --Plain click, no modifier -- click-to-cast, but ONLY when
-            --NotActive (see TryClickCast). Was previously unbound/no-op on
+            --Attention or NotActive (see TryClickCast). Was previously unbound/no-op on
             --a cell; same gating reasoning as the Ctrl-click branch above
             --applies here -- checked BEFORE hit-testing/blocking, not just
             --inside TryClickCast, so a plain click with the feature off

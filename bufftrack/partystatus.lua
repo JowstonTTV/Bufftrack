@@ -1,8 +1,7 @@
 --[[
     partystatus.lua
 
-    Real-time status-icon reading for early-loss correction, ported from
-    focustarget.lua's get_status_ids (used elsewhere in this environment).
+    Real-time status-icon reading for early-loss correction.
     Without this, an assignment's cell just counts its locally-estimated
     duration down to zero even if the buff actually disappeared early --
     dispelled, resisted off, overwritten by something else occupying the

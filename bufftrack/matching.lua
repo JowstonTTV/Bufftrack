@@ -22,7 +22,6 @@
 ]]--
 
 local durations = require('durations.include');
-local buffTable = require('libs.bufftable');
 local mobSkillNames = require('libs.mobskills');
 local statusEffectNames = require('libs.statuseffects');
 
@@ -128,14 +127,6 @@ local function FuzzyFind(candidates, query)
     return nil, best; --either empty (no match) or ambiguous (tie)
 end
 
---Only exclude a candidate when bufftable EXPLICITLY classifies its buff id
---as a debuff (1). Absence from the table is treated as "unknown", not
---"debuff" -- an incomplete classification table should never suppress a
---genuinely assignable buff from ever showing up in fuzzy search.
-local function IsKnownDebuff(buffId)
-    return buffTable.statusEffects[buffId] == 1;
-end
-
 --[[
     Buff index -- built lazily on first use, then cached for the session.
     Probes every spell/ability ID against the duration library using the
@@ -164,7 +155,7 @@ local function BuildBuffIndex()
                 --require a real BuffId), so it can't be a trackable entry
                 --regardless of what the duration probe found. Confirmed
                 --live: an entry like this crashed config.lua's Buffs tab.
-                if (buffId ~= nil) and (not IsKnownDebuff(buffId)) then
+                if (buffId ~= nil) then
                     index:append({ Label = res.Name[1], ActionType = 'Spell', ActionId = id, BuffId = buffId });
                 end
             end
@@ -179,7 +170,7 @@ local function BuildBuffIndex()
                 if type(buffId) == 'table' then
                     buffId = buffId[1];
                 end
-                if (buffId ~= nil) and (not IsKnownDebuff(buffId)) then
+                if (buffId ~= nil) then
                     index:append({ Label = res.Name[1], ActionType = 'Ability', ActionId = id, BuffId = buffId });
                 end
             end
@@ -271,9 +262,8 @@ local function GetAnyMobSkillIndex()
 end
 
 --[[
-    Debuff status effect names -- libs/statuseffects.lua, sourced from
-    libs/bufftable.lua's own statusEffects table (see that file's header on
-    why the numbering is trusted). Used for trackers/curable.lua's "add an
+    Debuff status effect names -- libs/statuseffects.lua, generated from the
+    server's status effect list. Used for trackers/curable.lua's "add an
     Erase-covered debuff" flow (by NAME instead of a raw status id) and for
     the Cures tab's display labels.
 ]]--
